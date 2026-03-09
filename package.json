@@ -7,7 +7,7 @@
         "prod": "npm run production",
         "production": "mix --production",
         "build": "vite build",
-        "heroku-postbuild": "npm install --only-dev && npm run build"
+        "heroku-postbuild": "npm run build"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.2",
