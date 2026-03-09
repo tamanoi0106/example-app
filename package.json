@@ -3,6 +3,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
+        "production": "mix --production",
         "heroku-postbuild": "npm run production"
     },
     "devDependencies": {
