@@ -5,31 +5,36 @@ namespace App\Services;
 use App\Models\Tweet;
 use Carbon\Carbon;
 use App\Models\Image;
+use App\Modules\ImageUpload\ImageManagerInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class TweetService
 {
-	public function getTweets()
-	{
-		return Tweet::with('images')->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->get();
-	}
+    public function __construct(private ImageManagerInterface $imageManager)
+    {}
 
-	public function checkOwnTweet(int $userId, int $tweetId): bool
-	{
-		$tweet = Tweet::where('id', $tweetId)->first();
-		if (!$tweet) {
-			return false;
-		}
+    public function getTweets()
+    {
+        return Tweet::with('images')->orderBy('created_at', 'DESC')->get();
+    }
 
-		return $tweet->user_id === $userId;
-	}
+    // 自分のtweetかどうかをチェックするメソッド
+    public function checkOwnTweet(int $userId, int $tweetId): bool
+    {
+        $tweet = Tweet::where('id', $tweetId)->first();
+        if (!$tweet) {
+            return false;
+        }
 
-	public function countYesterdayTweets(): int
-	{
-		return Tweet::whereDate('created_at', '>=', Carbon::yesterday()->toDateTimeString())->whereDate('created_at', '<', Carbon::today()->toDateTimeString())->count();
-	}
-
+        return $tweet->user_id === $userId;
+    }
+    public function countYesterdayTweets(): int
+    {
+        return Tweet::whereDate('created_at', '>=', Carbon::yesterday()->toDateTimeString())
+            ->whereDate('created_at', '<', Carbon::today()->toDateTimeString())
+            ->count();
+    }
     public function saveTweet(int $userId, string $content, array $images)
     {
         DB::transaction(function () use ($userId, $content, $images) {
@@ -38,30 +43,25 @@ class TweetService
             $tweet->content = $content;
             $tweet->save();
             foreach ($images as $image) {
-                Storage::putFile('public/images', $image);
+                $name = $this->imageManager->save($image);
                 $imageModel = new Image();
-                $imageModel->name = $image->hashName();
+                $imageModel->name = $name;
                 $imageModel->save();
                 $tweet->images()->attach($imageModel->id);
             }
         });
     }
-
-	public function deleteTweet(int $tweetId)
+    public function deleteTweet(int $tweetId)
     {
         DB::transaction(function () use ($tweetId) {
             $tweet = Tweet::where('id', $tweetId)->firstOrFail();
             $tweet->images()->each(function ($image) use ($tweet){
-                $filePath = 'public/images/' . $image->name;
-                if(Storage::exists($filePath)){
-                    Storage::delete($filePath);
-                }
+                $this->imageManager->delete($image->name);
                 $tweet->images()->detach($image->id);
                 $image->delete();
             });
-
             $tweet->delete();
         });
     }
-	
 }
+
